@@ -2,45 +2,41 @@ name: Auto Content Push
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 14 * * *'
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Set up job
+      run: echo "Starting job..."
+
     - name: Checkout repo
       uses: actions/checkout@v3
 
     - name: Set up SSH
       run: |
         mkdir -p ~/.ssh
-        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        echo "${{ secrets.SSL_PRIVATE_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan github.com >> ~/.ssh/known_hosts
-        echo "✅ SSH key loaded and known_hosts set"
 
     - name: Create Content
       run: |
         mkdir -p content
-        FILENAME=post-$(date '+%Y-%m-%d').md
-        echo "## Daily Crypto Update - $(date '+%Y-%m-%d')" > content/$FILENAME
-        echo "\nThis is an AI-generated update. 🚀" >> content/$FILENAME
-        echo "✅ Created content/$FILENAME"
+        echo "# Daily update for $(date +'%Y-%m-%d')" > content/post-$(date +'%Y-%m-%d').md
 
     - name: Update Homepage
       run: |
-        echo "# Welcome to Crypto Corner" > README.md
-        echo "\nLatest post: [$(date '+%Y-%m-%d')](content/post-$(date '+%Y-%m-%d').md)" >> README.md
-        echo "\nCurated by automation, built for the future. 🌐" >> README.md
-        echo "✅ Updated README.md"
+        echo "# Crypto Corner" > README.md
+        echo "" >> README.md
+        echo "Latest update: $(date)" >> README.md
 
     - name: Commit and Push
       run: |
         git config --global user.name "CryptoCornerBot"
-        git config --global user.email "bot@crypto-corner.org"
+        git config --global user.email "bot@cryptocorner.org"
         git remote set-url origin git@github.com:ccollective/crypto-corner.git
-        git add content/ README.md
-        git commit -m "🤖 Daily update - $(date '+%Y-%m-%d')" || echo "No changes to commit"
+        git add .
+        git commit -m "🔄 Daily update - $(date +'%Y-%m-%d')" || echo "Nothing to commit"
         git push origin main
