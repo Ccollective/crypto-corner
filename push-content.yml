@@ -1,0 +1,35 @@
+name: Auto Content Push
+
+on:
+  schedule:
+    - cron: '0 14 * * *'  # Daily at 2:00 PM UTC
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+
+    - name: Set up SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+    - name: Generate Content
+      run: |
+        mkdir -p content
+        echo "## Daily Crypto Update - $(date '+%Y-%m-%d')" > content/post-$(date '+%Y-%m-%d').md
+        echo "\nAuto-generated content about top crypto trends will appear here. 🚀" >> content/post-$(date '+%Y-%m-%d').md
+
+    - name: Commit and Push
+      run: |
+        git config --global user.name "CryptoCornerBot"
+        git config --global user.email "bot@crypto-corner.org"
+        git add content/
+        git commit -m "Daily content update - $(date '+%Y-%m-%d')" || echo "No changes to commit"
+        git push origin main
