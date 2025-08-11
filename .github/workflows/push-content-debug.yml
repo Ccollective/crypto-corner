@@ -1,42 +1,95 @@
 name: Auto Content Push
 
 on:
+  schedule:
+    - cron: '0 14 * * *'   # daily 14:00 UTC
   workflow_dispatch:
+
+permissions:
+  contents: write   # <-- allows pushes with GITHUB_TOKEN
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Set up job
-      run: echo "Starting job..."
+    - name: Checkout (no persisted creds)
+      uses: actions/checkout@v4
+      with:
+        persist-credentials: false
 
-    - name: Checkout repo
-      uses: actions/checkout@v3
-
-    - name: Set up SSH
+    - name: Generate daily content
       run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan github.com >> ~/.ssh/known_hosts
-
-    - name: Create Content
-      run: |
+        set -e
         mkdir -p content
-        echo "# Daily update for $(date +'%Y-%m-%d')" > content/post-$(date +'%Y-%m-%d').md
+        DATE=$(date -u +'%Y-%m-%d')
+        FILE="content/post-$DATE.md"
+        {
+          echo "# 📰 Crypto News Highlights — $DATE"
+          echo
+          echo "- Top movers summary will appear here."
+          echo "- Meme coins roundup will appear here."
+          echo "- Legal & regulation digest will appear here."
+          echo "- **New ICOs/IPOs** watchlist will appear here."
+          echo
+          echo "_This page is auto-generated daily._"
+        } > "$FILE"
 
-    - name: Update Homepage
+    - name: Ensure homepage exists + donation widgets
       run: |
-        echo "# Crypto Corner" > README.md
-        echo "" >> README.md
-        echo "Latest update: $(date)" >> README.md
+        cat > index.html <<'HTML'
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crypto Corner</title>
+<style>
+  body{margin:0;background:#0d1117;color:#c9d1d9;font-family:system-ui,Segoe UI,Arial}
+  .wrap{max-width:960px;margin:0 auto;padding:40px 20px}
+  h1{color:#58a6ff;margin:0 0 16px}
+  a{color:#58a6ff;text-decoration:none}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+  .card{background:#111826;border:1px solid #1f2937;border-radius:14px;padding:16px}
+  .badge{display:inline-block;padding:6px 10px;border:1px solid #374151;border-radius:999px;margin:4px 6px 0 0;font-size:12px}
+  footer{margin-top:32px;font-size:13px;opacity:.8}
+  .qr{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+  .qr img{width:120px;height:120px;background:#fff;padding:8px;border-radius:10px}
+</style>
+</head><body><div class="wrap">
+  <h1>Crypto Corner</h1>
+  <p>Daily AI-generated crypto news: top movers, meme coins, legal/regulatory, and latest ICOs/IPOs.</p>
 
-    - name: Commit and Push
+  <h2>Latest post</h2>
+  <p>See today’s update in <a href="./content/">/content</a>.</p>
+
+  <h2>Topics</h2>
+  <div class="grid">
+    <div class="card"><h3>Top Movers</h3><p>Daily gainers/losers snapshot.</p></div>
+    <div class="card"><h3>Meme Coins</h3><p>Hype and social signals roundup.</p></div>
+    <div class="card"><h3>Legal & Regulation</h3><p>Major filings, rulings, and guidance.</p></div>
+    <div class="card"><h3>ICOs / IPOs</h3><p>Upcoming and active token launches.</p></div>
+  </div>
+
+  <h2>Support Us</h2>
+  <div class="qr">
+    <div>
+      <div class="badge">ETH / EVM</div>
+      <div>0x866b24F6306449120276395BD197948BF6ff25e3</div>
+      <img alt="ETH QR" src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=0x866b24F6306449120276395BD197948BF6ff25e3">
+    </div>
+    <div>
+      <div class="badge">Solana</div>
+      <div>HvQvmnzjNwJFTXgRirrEmRGhBrLH2KY9PTLLinFwcwjN</div>
+      <img alt="SOL QR" src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=HvQvmnzjNwJFTXgRirrEmRGhBrLH2KY9PTLLinFwcwjN">
+    </div>
+  </div>
+
+  <footer>© Crypto Corner — updated daily by automation.</footer>
+</div></body></html>
+HTML
+
+    - name: Commit & push with GITHUB_TOKEN
       run: |
-        git config --global user.name "CryptoCornerBot"
-        git config --global user.email "bot@cryptocorner.org"
-        git remote set-url origin git@github.com:ccollective/crypto-corner.git
-        git add .
-        git commit -m "🔄 Daily update - $(date +'%Y-%m-%d')" || echo "Nothing to commit"
-        git push origin main
+        git config user.name  "CryptoCornerBot"
+        git config user.email "bot@crypto-corner.org"
+        git add -A
+        git commit -m "Daily site refresh: $(date -u +'%Y-%m-%dT%H:%M:%SZ')" || echo "No changes"
+        git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/ccollective/crypto-corner.git HEAD:main
